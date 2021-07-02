@@ -1,0 +1,90 @@
+@charset "utf-8";
+html {
+    color: #333;
+    background: #fff;
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+    text-rendering: optimizelegibility;
+    font-size: 16px;
+    -webkit-font-smoothing: initial;
+}
+
+body,
+button,
+input,
+select,
+textarea {
+    font: 300 1em/1.8 "PingFang SC", "Lantinghei SC", "Microsoft Yahei", "Hiragino Sans GB", "Microsoft Sans Serif", "WenQuanYi Micro Hei", sans;
+    color: #000;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: "PingFang SC", "Lantinghei SC", "Microsoft Yahei light", "Hiragino Sans GB", "Microsoft Sans Serif", "WenQuanYi Micro Hei", sans;
+    -webkit-font-smoothing: initial;
+    font-weight: 100;
+    color: black !important;
+    line-height: 1.35;
+    font-variant-numeric: lining-nums;
+    margin-bottom: 1em;
+}
+
+em {
+    font-family: Georgia-Italic, STSongti-SC-Light, serif;
+}
+
+strong em,
+em strong {
+    font-family: Georgia-BoldItalic, STSongti-SC-Regular, serif;
+}
+
+.markdown-section {
+    max-width: 90%;
+}
+
+.content {
+    padding-top: 0;
+}
+
+a {
+    text-decoration: none !important;
+}
+
+h1 {
+    text-align: center;
+}
+
+.markdown-section hr {
+    display: flex;
+    align-items: center;
+    height: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+    flex-grow: 1;
+    --tw-bg-opacity: 0.1;
+    --bc: 215 27.9% 16.9%;
+    background-color: hsla(var(--bc)/var(--tw-bg-opacity));
+    height: .125rem
+}
+
+.serif {
+    font-family: Palatino, Optima, Georgia, serif;
+    padding: 0 0.2em;
+}
+
+.anchor span {
+    color: #000;
+}
+
+#main>p {
+    text-indent: 2em
+}
+
+img {
+    margin: 0 auto;
+    display: block;
+}
