@@ -1,4 +1,4 @@
-[logo](_media/logo.png)
+![logo](_media/logo.png)
 
 # Java杂货铺
 

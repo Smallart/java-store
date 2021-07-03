@@ -6,10 +6,7 @@
 * [请求和响应](/javaee/servlet/req-resp)
 * [会话管理](/javaee/servlet/sessionManagement)
 * [过滤器和监听器](/javaee/servlet/filter-listener)
-
-* session 与 cookie 不同
-* ServletContext.getRequestDispatcher 和 request.getRequestDispatcher
-* web应用的八大对象
+* [补充](/javaee/servlet/supplement)
 
 ## 参考资料
 

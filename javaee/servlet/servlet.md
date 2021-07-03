@@ -135,7 +135,28 @@ String pathInfo = req.getPathInfo();
 当整个[-[Web]-]应用程序加载[-[Web]-]容器之后，容器会产生一个[-[ServletContext]-]对象作为整个程序的代表，并设置给[-[ServletConfig]-]，只要通过[-[servletConfig]-]的[-[getServletContext]-]方法就可以取得[-[ServletContext]-]对象。
 
 几个[-[API]-]：
-* [-[getRequstDispatcher]-]：与[-[request.getRequestDispatcher]-]有啥区别
+* [-[getRequstDispatcher]-]：与[-[request.getRequestDispatcher]-]有啥区别？
+
+这个就要分情况讨论了，如果参数[-[URL]-]使用的是绝对路径，这两个就没啥区别。但是如何是相对路径，这个两个方法的对应的根路径不同，[-[ServletContext]-]表示的是整个项目的根路径，而[-[Request]-]的表示当前请求的根路径。如下
+````java
+
+//假设其项目路径 localhost:8080/project/
+
+//此Servlet的URL对映为 /dispatcher/req
+request.getRequestDispatcher("/demo").include(req,resp); //结果 localhost:8080/project/demo
+
+//此Servlet的URL对映为 /dispatcher/servlet
+servletContext.getRequestDispatcher("/demo").include(req,resp); //结果 localhost:8080/project/demo
+
+
+request.getRequestDispatcher("demo").include(req,resp); // localhost:8080/project/dispatcher/demo
+
+servletContext.getRequestDispatcher("demo").include(req,resp); //相对路径会报错
+
+````
+
+[具体代码]()
+
 * [-[getResourceAsStream]-]：如果想在[-[Web]-]应用程序中读取某个文件内容，就是用这个方法。使用指定路径必须以“/”作为开头，表示应用程序环境根目录，或则相对应[-[/WEB-INF/lib]-]中[-[JAR]-]文件里[-[META-INF/resources]-]的路径，返回结果会返回[-[InputStream]-]实例，接着就可以运用它来读取文件内容。
 
 
