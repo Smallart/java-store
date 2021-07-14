@@ -1,11 +1,3 @@
-# [-[Java]-]杂货铺
+# 说明
 
-> 记录之前不懂的知识点
-
-## [-[JavaSE]-]
-
-## [-[JavaEE]-]
-
-* [[-[Servlet]-]](/javaee/servlet/index)
-
-## [-[Spring]-]
+> 一个关于记录[-[Java]-]知识点的博客
