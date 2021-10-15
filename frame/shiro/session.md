@@ -1,226 +1,97 @@
 # [-[Session]-]
 
-[-[Session]-]是用户与[-[Web]-]应用维持连接的一种手段。当用户操作应用期间，无论什么时候都有唯一的[-[Session]-]保存用户的相关信息。对于[-[Shiro]-]来说，[-[Session]-]部分是其的一大亮点，因为[-[Shiro]-]实现并且维护了自己的[-[Session]-]环境，不需要兼容其他的容器。
+[-[Session]-]是用户与[-[Web]-]应用维持连接的一种手段。当用户操作应用期间，无论什么时候都有唯一的[-[Session]-]保存用户的相关信息。对于[-[Shiro]-]来说，[-[Session]-]部分是其的一大亮点，因为[-[Shiro]-]实现并且维护了自己的[-[Session]-]环境，不需要兼容其他的容器。换句话就是说[-[Shiro]-]实现了自己的[-[Session]-]并且维护了这个[-[Session]-]的生命周期。
 
-虽然[-[Shiro]-]提供了基础的[-[Session]-]，但是如果不满足我们的项目需求，我们就需要通过继承[-[Shiro]-]的相关接口来实现自己的[-[Session]-]管理。对于[-[Session]-]管理，我们着重需要关注的是创建[-[Session]-]的时机、如何创建[-[Session]-]、如何刷新[-[Session]-]以及对于过期[-[Session]-]的处理。
+要了解[-[Session]-]的生命周期就需要先了解[-[Subject]-]的创建。
 
-[-[Shiro]-]中所有有关[-[Session]-]的相关操作都是交给了[-[SessionManager]-]这个组件去完成的，关于[-[SessionMananger]-]的具体继承如下
+![Subject创建](/img/ShiroSubjectCreate.png)
 
-![SessionManager继承](/img/sessionmananger-family.png)
+创建[-[Subject]-]有两个方面，一个是请求时经过[-[AbstractShiroFilter]-]时调用的`CreateSubject`方法，另一个是调用`Subject.login`方法进行登录操作。虽然这有两种方式都能创建`Subject`对象，但是还是所不同的。当你访问一个[-[Web]-]应用，首先请求会调用`AbstractShiroFilter.CreateSubject`这个方法，等登录时才会手动调用`Subject.login`方法，当登录之后本次会话的所有请求的`Subject`的创建都由`AbstractShiroFilter`来负责。
 
-## 创建[-[Session]-]
+![Session创建](/img/ShiroSessionCreate.png)
 
-当客户端与应用第一次建立连接时，应用便会通过调用`subject.getSession()`来创建当前会话。其中调用地方有两处：
+从上面的图可以我们知道在创建[-[Subject]-]需要获取[-[Session]-]以及[-[Principals]-]。当在未鉴权时发起请求，此时[-[Session]-]和[-[Pricipals]-]的相关信息都为空所以创建的[-[Subject]-]就不存在任何有用的东西，我们可以称此时的[-[Subject]-]是**匿名Subject**。
 
-* 过滤器
+当我们通过登录这个操作在后台调用`Subject.login`方法创建[-[Subject]-]，此方法会调用`Realm.doGetAuthenticationInfo`来获取认证信息，并且将该信息放入到上下文中用来创建`Subejct`;
+
+<details>
+<summary>源码</summary>
+
 ````java
-protected void saveRequestAndRedirectToLogin(ServletRequest request, ServletResponse response) throws IOException {
-    saveRequest(request);
-    redirectToLogin(request, response);
-}
-public static void saveRequest(ServletRequest request) {
-    Subject subject = SecurityUtils.getSubject();
-    Session session = subject.getSession();
-    HttpServletRequest httpRequest = toHttp(request);
-    SavedRequest savedRequest = new SavedRequest(httpRequest);
-    session.setAttribute(SAVED_REQUEST_KEY, savedRequest);
+protected Subject createSubject(AuthenticationToken token, AuthenticationInfo info, Subject existing) {
+    SubjectContext context = createSubjectContext();
+    context.setAuthenticated(true);
+    context.setAuthenticationToken(token);
+    context.setAuthenticationInfo(info);
+    context.setSecurityManager(this);
+    if (existing != null) {
+        context.setSubject(existing);
+    }
+    return createSubject(context);
 }
 ````
-* 创建[-[Subject]-]时，当前[-[Session]-]为null并且认证信息不为空时调用
-```java
- protected void mergePrincipals(Subject subject) {
-        PrincipalCollection currentPrincipals = null;
-        ……
-        if (currentPrincipals == null || currentPrincipals.isEmpty()) {
-            currentPrincipals = subject.getPrincipals();
-        }
+</details>
 
-        Session session = subject.getSession(false);
+此时由于创建的[-[Subject]-]对象带有认证信息，所以在`SaveToSesion`方法中就满足了当出现该此请求获取不到[-[Session]-]并且[-[Subject]-]带有认证信息的条件，此时就需要通过`SessionFactory.createSession`方法来创建[-[Session]-]。
 
-        if (session == null) {
-            if (!isEmpty(currentPrincipals)) {
-                session = subject.getSession();
-                session.setAttribute(DefaultSubjectContext.PRINCIPALS_SESSION_KEY, currentPrincipals);
-            }
-        }
-        ……
-    }
-```
+鉴权之后，在本次会话中用户的每一次请求可以通过[-[SessionID]-]来获取[-[Session]-]并创建对应的[-[Subject]-]，此时[-[Subject]-]对象中包含用户的鉴权信息。
 
-跟进`subject.getSession()`方法，可以看到其底层调用的是`sessionManager.start`的方法。
-```java
-public Session getSession(boolean create) {
-    ……
-    if (this.session == null && create) {
-        ……   
-        SessionContext sessionContext = createSessionContext();
-        Session session = this.securityManager.start(sessionContext);
-        this.session = decorate(session);
-    }
-    return this.session;
-}
-// SessionSecurityManager
-public Session start(SessionContext context) throws AuthorizationException {
-    return this.sessionManager.start(context);
-}
-```
+!> 需要注意的是，上面的解释是对于Web应用底层的[-[SessionManager]-]为`DefaultWebSessionManager`的流程，此时[-[Shiro]-]自己维护会话，直接废弃了[-[Servlet]-]容器的会话管理。如果相关交由[-[Servlet]-]容器管理，则底层`SessionManager`具体实现应为`ServletContainerSessionManager`，并且之后相关流程也不同。
 
-[-[Session]-]实现的相关步骤由其子类`AbstractNativeSessionManager`规定下来：
+具体情况参考[Session Problem](https://programmer.help/blogs/session-problem-after-spring-mvc-integrates-shiro.html)这篇文章。
 
-```java
-public Session start(SessionContext context) {
-    Session session = createSession(context);
-    applyGlobalSessionTimeout(session);
-    onStart(session, context);
-    notifyStart(session);
-    return createExposedSession(session, context);
-}
-````
-其中`createSession`的具体流程如下：
+总结一下，[-[Session]-]的创建最终调用的是`SessionFactory.createSession`方法，所有我们只需要继承重写相关方法就可以自定义[-[Session]-]。
 
-![创建Session](/img/progress-createSession.png)
+## [-[Session]-]维护
 
-## 刷新[-[Session]-]
+[-[Session]-]创建的问题已经解决了，那么来看看[-[Shiro]-]是如何维护[-[Session]-]的生命周期的。[-[Session]-]生命周期中最主要有两方面：一、请求时更新会话的最新访问时间。二、检测并且删除过期的[-[Session]-]。
 
-[-[Shiro]-]中的[-[Session]-]定义了如下的字段：
+对于会话的更新，就又不得不提到`AbstractShiroFilter.doFitlerInternal`中调用的`updateSessionLastAccessTime`方法。流程如下
 
-```java
-//SessionId
-private transient Serializable id;
-//session创建时间
-private transient Date startTimestamp;
-//session停止时间
-private transient Date stopTimestamp;
-//最后一次访问时间
-private transient Date lastAccessTime;
-//session的有效时长
-private transient long timeout;
-// sesison是否过期
-private transient boolean expired;
-// session的属性容器
-private transient Map<Object, Object> attributes;
-```
+![Session生命周期](/img/ShiroSessionLifeCycle.png)
 
-[-[Session]-]作为用户与客户端之间的一次会话，当长时间未访问时就需要清除该[-[Session]-]，此时就需要每次请求时都需要刷新该次会话包含的时间，改变相关状态。
+当每次请求到来之后，[-[Shiro]-]会调用`SessionManager`的`touch`方法。该方法包含了对[-[Session]-]生命周期维护的具体实现。首先，[-[Shiro]-]会通过`lookupRequiredSession`方法来开启定时任务，该任务来剔除应用中过期的[-[Session]-]。之后通过`validate`方法来校验当前访问的会话状态，对于过期、停止状态的[-[Session]-]的具体实现交由对应的[-[SessionManager]-]处理。之后回到`AbstractNativeSessionManager`中调用[-[Session]-]的`touch`方法，并且继续`onChange`逻辑。
 
-[-[Shiro]-]每次通过`AbstractShiroFilter`的`doFilterInternal`方法来调用[-[Session]-]的`touch`方法来实现最后一次访问时间的更新。
+<details>
+<summary>ExecutorServiceSessionValidationScheduler（定时任务的实现）</summary>
+
 ````java
-protected void doFilterInternal(ServletRequest servletRequest, ServletResponse servletResponse, final FilterChain chain)
-        throws ServletException, IOException {
-        ……
-        subject.execute(new Callable() {
-            public Object call() throws Exception {
-                updateSessionLastAccessTime(request, response);
-                executeChain(request, response, chain);
-                return null;
-            }
-        });
-    ……
-}
-protected void updateSessionLastAccessTime(ServletRequest request, ServletResponse response) {
-    ……
-    session.touch();
-    ……
-}
-````
-
-## [-[Session]-]状态监控
-
-[-[Session]-]都有一个生存时间，如果超过这个时间内没有对[-[Sesison]-]进行访问就需要删除该[-[Session]-]。在创建[-[Session]-]的步骤间，`AbstractValidatingSessionManager`添加了对[-[Session]-]状态的监控，其中`createSession`方法中就启动了`enableSessionValidationIfNecessary()`检验类。
-
-```java
-private void enableSessionValidationIfNecessary() {
-    SessionValidationScheduler scheduler = getSessionValidationScheduler();
-    if (isSessionValidationSchedulerEnabled() && (scheduler == null || !scheduler.isEnabled())) {
-        enableSessionValidation();
-    }
-}
-
-protected synchronized void enableSessionValidation() {
-    SessionValidationScheduler scheduler = getSessionValidationScheduler();
-    if (scheduler == null) {
-        scheduler = createSessionValidationScheduler();
-        setSessionValidationScheduler(scheduler);
-    }
-    if (!scheduler.isEnabled()) {
-        if (log.isInfoEnabled()) {
-            log.info("Enabling session validation scheduler...");
-        }
-        scheduler.enableSessionValidation();
-        afterSessionValidationEnabled();
-    }
-}
-```
-[-[Shiro]-]的`SessionValidationScheduler`方法定义了校验的接口，其默认时通过实现`enableSessionvalidation`方法定义一个定时任务来调用`SessionManager`的`validateSession`方法。
-
-```java
-// ExecutorServiceSessionValidationScheduler
 public void enableSessionValidation() {
-        if (this.interval > 0l) {
-            this.service = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {  
-	            private final AtomicInteger count = new AtomicInteger(1);
+    if (this.interval > 0l) {
+        this.service = Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {  
+            private final AtomicInteger count = new AtomicInteger(1);
 
-	            public Thread newThread(Runnable r) {  
-	                Thread thread = new Thread(r);  
-	                thread.setDaemon(true);  
-	                thread.setName(threadNamePrefix + count.getAndIncrement());
-	                return thread;  
-	            }  
-            });                  
-            this.service.scheduleAtFixedRate(this, interval, interval, TimeUnit.MILLISECONDS);
-        }
-        this.enabled = true;
+            public Thread newThread(Runnable r) {  
+                Thread thread = new Thread(r);  
+                thread.setDaemon(true);  
+                thread.setName(threadNamePrefix + count.getAndIncrement());
+                return thread;  
+            }  
+        });                  
+        this.service.scheduleAtFixedRate(this, interval, interval, TimeUnit.MILLISECONDS);
     }
-
-    public void run() {
-        ……
-        Thread.currentThread().setUncaughtExceptionHandler((t, e) -> {
-            log.error("Error while validating the session, the thread will be stopped and session validation disabled", e);
-            this.disableSessionValidation();
-        });
-        ……
-            this.sessionManager.validateSessions();
-        ……
-    }
-```
-
-默认的`SessionManager`的`validateSessions`实现。
-
-```java
-public void validateSessions() {
-    ……
-    //失效Session个数
-    int invalidCount = 0;
-    //从SessionDao的getActiveSession中获取Sessions
-    Collection<Session> activeSessions = getActiveSessions();
-
-    if (activeSessions != null && !activeSessions.isEmpty()) {
-        for (Session s : activeSessions) {
-            try {
-                SessionKey key = new DefaultSessionKey(s.getId());
-                validate(s, key);
-            } catch (InvalidSessionException e) {
-                ……
-                invalidCount++;
-            }
-        }
-    }
-    ……
+    this.enabled = true;
 }
-//相关操作都会交给sessionDao去操作
-protected void validate(Session session, SessionKey key) throws InvalidSessionException {
-    try {
-        //判断当前session是否有效
-        doValidate(session);
-    } catch (ExpiredSessionException ese) {
-        //过期处理
-        onExpiration(session, ese, key);
-        throw ese;
-    } catch (InvalidSessionException ise) {
-        //无效处理
-        onInvalidation(session, ise, key);
-        throw ise;
+
+public void run() {
+    if (log.isDebugEnabled()) {
+        log.debug("Executing session validation...");
     }
-}    
-```
-默认情况下，定时线程是每60分钟检测一次，但是[-[Session]-]的默认生命周期为30分钟，这样看起来我们获得的[-[Session]-]可能会有问题。但是这并不需要担心，因为[-[Shiro]-]在`AbsctractNativeSessionManager`中，每次调用`getSession`时都会先调用`lookupSession`这个方法来对[-[Session]-]进行有效性检测。
+    Thread.currentThread().setUncaughtExceptionHandler((t, e) -> {
+        log.error("Error while validating the session, the thread will be stopped and session validation disabled", e);
+        this.disableSessionValidation();
+    });
+    long startTime = System.currentTimeMillis();
+    try {
+        this.sessionManager.validateSessions();
+    } catch (RuntimeException e) {
+        log.error("Error while validating the session", e);
+        //we don't stop the thread
+    }
+    long stopTime = System.currentTimeMillis();
+    if (log.isDebugEnabled()) {
+        log.debug("Session validation completed successfully in " + (stopTime - startTime) + " milliseconds.");
+    }
+}
+````
+</details>

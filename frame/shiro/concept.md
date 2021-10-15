@@ -36,21 +36,3 @@
     
 * [-[CacheManager]-]：创建并且管理被其他安全使用[-[Cache]-]实例的生命周期，可以接入其他的缓存框架。
 * [-[Cryptography ]-]: 通过加密来保证数据的安全性。[-[Shiro]-]的加密组件基于[-[Java]-]，但是更加的简化和易用，从上面详细的架构可以看到，它是独立于[-[SecurityMananger]-]的一个组件，也就是它可以独立使用，相当于常规的包。
-
-
-## 缓存[-[Cache]-]
-
-设置缓存的目的是为了提高效率，[-[Shiro]-]并没有实现真正的缓存功能，而是提供了相应的接口将其他的缓存框架整合到一起，来提供简单易用的缓存模式。其使用方式为需要的组件设置[-[Cache Manager]-]，并且设置对应的缓存名称。具体实现如下：
-
-```java
-// Session的缓存名称 默认为 shiro-activeSessionCache
-OnlineWebSessionManager manager = new OnlineWebSessionManager();
-// 加入缓存管理器
-manager.setCacheManager(getEhCacheManager());
-
-//对于Realm的鉴权 授权操作要设置CacheName 否则为null
-UserRealm userRealm = new UserRealm();
-userRealm.setAuthorizationCacheName();
-userRealm.setAuthenticationCacheName();
-userRealm.setCacheManager(cacheManager);
-```
